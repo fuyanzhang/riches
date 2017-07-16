@@ -11,8 +11,8 @@ condition常用方法：
 
 ###condition源码分析
 啥也不说，撸一波源码：
-```
- public final void await() throws InterruptedException {
+
+     public final void await() throws InterruptedException {
             if (Thread.interrupted())
                 throw new InterruptedException();
             Node node = addConditionWaiter();
@@ -30,5 +30,4 @@ condition常用方法：
             if (interruptMode != 0)
                 reportInterruptAfterWait(interruptMode);
         }
-
-```
+    
