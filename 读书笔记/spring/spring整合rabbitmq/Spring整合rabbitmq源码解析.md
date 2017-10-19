@@ -29,3 +29,6 @@ spring-rabbit中标签有：
 ### 消息发送流程 ###
 
 ### 消息消费流程 ###
+
+
+![测试图片](https://i.imgur.com/EA3kZyM.png)
