@@ -31,4 +31,4 @@ spring-rabbit中标签有：
 ### 消息消费流程 ###
 
 
-![测试图片](https://i.imgur.com/EA3kZyM.png)
+![测试图片](https://github.com/fuyanzhang/riches/blob/master/%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/spring/spring%E6%95%B4%E5%90%88rabbitmq/pic/JobManagerV3.0.png)
