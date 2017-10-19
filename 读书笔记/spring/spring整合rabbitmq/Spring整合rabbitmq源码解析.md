@@ -20,7 +20,12 @@ spring-rabbit中标签有：
 
 标签定义在spring-rabbit-xxx.jar包中。handler为`org.springframework.amqp.rabbit.config.RabbitNamespaceHandler`
 
+
 ### queue概述 ###
 
 
 ### exchange概述 ###
+
+### 消息发送流程 ###
+
+### 消息消费流程 ###
