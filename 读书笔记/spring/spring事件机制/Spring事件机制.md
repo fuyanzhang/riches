@@ -5,7 +5,7 @@
 1. 事件的定义
 
 ```
-	public class TestEvent extends ApplicationEvent{
+public class TestEvent extends ApplicationEvent{
     public TestEvent(Object source) {
         super(source);
         System.out.println("trigger TestEvent !!!");
@@ -31,6 +31,8 @@
 	    }
 	}
 	```
+发布者实现ApplicationEventPublisherAware，同时也可以实现ApplicationContextAware，二者效果是一样的，最终都是调用ApplicationEventPublisher的publishEvent方法。
+
 
 3. 监听者
 
