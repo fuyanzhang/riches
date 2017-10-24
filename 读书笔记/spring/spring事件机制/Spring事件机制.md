@@ -32,7 +32,7 @@ public class TestEvent extends ApplicationEvent{
 	}
 	```
 发布者实现ApplicationEventPublisherAware，同时也可以实现ApplicationContextAware，二者效果是一样的，最终都是调用ApplicationEventPublisher的publishEvent方法。
-
+![](https://github.com/fuyanzhang/riches/blob/master/%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/spring/spring%E4%BA%8B%E4%BB%B6%E6%9C%BA%E5%88%B6/pic/ApplicationContext%20%E7%B1%BB%E5%9B%BE.png)
 
 3. 监听者
 
