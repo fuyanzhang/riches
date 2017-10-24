@@ -61,4 +61,11 @@ public class TestPublisher1 implements ApplicationContextAware {
     }
 }
 ```
+
 监听者实现ApplicationListener，泛型加入事件类型。其中如何处理且听下节分享。
+
+### 源码阅读 ###
+
+我们从发布事件的地方作为入口来阅读，即ApplicationEventPublisher.publishEvent();
+其中ApplicationEventPublisher是一个接口，其实publishEvent方法的实现在AbstractApplicationContext中。
+AbstractApplicationContext类图：![](https://github.com/fuyanzhang/riches/blob/master/%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/spring/spring%E4%BA%8B%E4%BB%B6%E6%9C%BA%E5%88%B6/pic/AbstractApplicationContext.png)
