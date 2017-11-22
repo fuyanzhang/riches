@@ -1,0 +1,20 @@
+@startuml
+QuartzSchedulerThread -->JobStoreSupport: acquireNextTriggers()
+JobStoreSupport-->JobStoreSupport : executeInNonManagedTXLock()
+JobStoreSupport-->Semaphore :obtainLock() 获取TRIGGER_ACCESS行级锁
+JobStoreSupport -->JobStoreSupport : acquireNextTrigger()[取trigger表中，\n状态是WAITING，nextfireTime在当前\n时间前60s内到之后30s共90s内的trigger]
+JobStoreSupport -->JobStoreSupport: retrieveJob()获取jobdetail信息
+JobStoreSupport --> StdJDBCDeletate : updateTriggerStateFromOtherState(),更新trigger状态为ACQUIRED
+JobStoreSupport-->StdJDBCDeletate :insertFiredTrigger(),向FIRED_TRIGGERS中插入待触发的trigger
+JobStoreSupport-->JobStoreSupport :commitConnection() 提交事务，释放TRIGGER_ACCESS行级锁
+QuartzSchedulerThread -->QuartzSchedulerThread:schedule里有更新，处理更新(有新的trigger加入，且更紧急的任务)
+QuartzSchedulerThread-->JobStoreSupport:triggersFired(),触发
+JobStoreSupport -->Semaphore :obtainLock() 获取TRIGGER_ACCESS行级锁
+JobStoreSupport-->JobStoreSupport:triggersFired(),遍历获取的trigger，触发
+JobStoreSupport -->JobStoreSupport : retrieveJob()获取jobdetail信息
+JobStoreSupport-->StdJDBCDeletate :updateFiredTrigger(),向FIRED_TRIGGERS中更新信息，将状态置为EXECUTING
+JobStoreSupport --> QuartzSchedulerThread:返回结果
+JobStoreSupport -->Semaphore :obtainLock() 获取TRIGGER_ACCESS行级锁
+QuartzSchedulerThread -->QuartzSchedulerThread:构造真正的执行器JobRunShell
+QuartzSchedulerThread --> QuartzSchedulerThread : 将JobRunShell放入线程池中执行
+@enduml
