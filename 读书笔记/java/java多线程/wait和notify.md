@@ -67,3 +67,7 @@ public class TestWaitAndNotify {
 
 
 ```
+
+当线程调用了wait方法后，该线程就进入了该对象的等待队列。当调用notify方法后，会从等待队列中随机取一个线程唤醒。若调用notifyall方法，则将等待队列中的所有线程唤醒。
+
+wait和sleep的区别：调用wait方法，该线程会将对象锁释放。sleep不会。
