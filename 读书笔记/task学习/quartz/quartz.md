@@ -8,6 +8,7 @@
 
 quartz的trigger有如下几种：
 DailyTimeInterValTriggerImpl,CronTriggerImpl,SimpleTriggerImpl,CalendarIntervalTriggerImpl.其中最常用的是CronTriggerImpl,SimpleTriggerImpl两种。下面就最常见的两种trigger的misfired处理机制做个说明。
+misfired 主要是修改下次执行时间。不同的策略有不同的nextfireTime计算方式。
 
 1. CronTriggerImpl
 
@@ -35,6 +36,12 @@ DailyTimeInterValTriggerImpl,CronTriggerImpl,SimpleTriggerImpl,CalendarIntervalT
         }
     }
 	```
+
+当前策略只有四种，分别为：
+MISFIRE_INSTRUCTION_IGNORE_MISFIRE_POLICY=-1
+MISFIRE_INSTRUCTION_SMART_POLICY=0
+MISFIRE_INSTRUCTION_FIRE_ONCE_NOW=1
+MISFIRE_INSTRUCTION_DO_NOTHING=2
 
 
 
