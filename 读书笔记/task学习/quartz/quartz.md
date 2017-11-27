@@ -38,14 +38,18 @@ misfired 主要是修改下次执行时间。不同的策略有不同的nextfire
 	```
 
 当前策略只有四种，分别为：
-MISFIRE_INSTRUCTION_IGNORE_MISFIRE_POLICY=-1
-MISFIRE_INSTRUCTION_SMART_POLICY=0
-MISFIRE_INSTRUCTION_FIRE_ONCE_NOW=1
-MISFIRE_INSTRUCTION_DO_NOTHING=2
+*MISFIRE_INSTRUCTION_IGNORE_MISFIRE_POLICY=-1*
+
+*MISFIRE_INSTRUCTION_SMART_POLICY=0*
+
+*MISFIRE_INSTRUCTION_FIRE_ONCE_NOW=1*
+
+*MISFIRE_INSTRUCTION_DO_NOTHING=2*
 
 ```
 - MISFIRE_INSTRUCTION_IGNORE_MISFIRE_POLICY 
-	当策略为-1时，会将之前misfired的所有job trigger一遍，直到当前任务执行周期。
+	当策略为-1时，会将之前misfired的所有周期的job trigger一遍，直到当前任务执行周期。
+	“select * from triggers where schedulername="" and state="?"and netx_fire_time <="?" and (misfire_instr=-1 or( misfire_instr != -1 and next_fire_time >=?))”这个sql中【misfire_instr=-1】是关键代码。
 - MISFIRE_INSTRUCTION_SMART_POLICY MISFIRE_INSTRUCTION_FIRE_ONCE_NOW
 	CronTrigger的默认策略是0，与1策略一样，资源准备完成后执行一次
 - MISFIRE_INSTRUCTION_DO_NOTHING
