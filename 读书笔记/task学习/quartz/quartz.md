@@ -51,9 +51,9 @@ misfired 主要是修改下次执行时间。不同的策略有不同的nextfire
 	当策略为-1时，会将之前misfired的所有周期的job trigger一遍，直到当前任务执行周期。
 	“select * from triggers where schedulername="" and state="?"and netx_fire_time <="?" and (misfire_instr=-1 or( misfire_instr != -1 and next_fire_time >=?))”这个sql中【misfire_instr=-1】是关键代码。
 - MISFIRE_INSTRUCTION_SMART_POLICY MISFIRE_INSTRUCTION_FIRE_ONCE_NOW
-	CronTrigger的默认策略是0，与1策略一样，资源准备完成后执行一次
+	CronTrigger的默认策略是0，与1策略一样，资源准备完成后执行一次，即将nextfiretime设置成当前时间。等待有资源后调用。若一直没资源，那么会一直被misfired，直到有资源，立即被执行一次，然后就是正常的调用了。
 - MISFIRE_INSTRUCTION_DO_NOTHING
-	比较复杂一点
+	一坨复杂的计算，主要功能就是misfired之后，啥也不干，然后等待正常的调用。
 ```
 
 
@@ -160,3 +160,50 @@ misfired 主要是修改下次执行时间。不同的策略有不同的nextfire
 
     }
 ```
+
+simpleTrigger有7种策略。
+
+*MISFIRE_INSTRUCTION_IGNORE_MISFIRE_POLICY=-1*
+
+*MISFIRE_INSTRUCTION_SMART_POLICY=0*
+
+*MISFIRE_INSTRUCTION_FIRE_NOW = 1*
+
+*MISFIRE_INSTRUCTION_RESCHEDULE_NOW_WITH_EXISTING_REPEAT_COUNT = 2*
+
+*MISFIRE_INSTRUCTION_RESCHEDULE_NOW_WITH_REMAINING_REPEAT_COUNT = 3*
+
+*MISFIRE_INSTRUCTION_RESCHEDULE_NEXT_WITH_REMAINING_COUNT = 4*
+
+*MISFIRE_INSTRUCTION_RESCHEDULE_NEXT_WITH_EXISTING_COUNT = 5*
+
+```
+- MISFIRE_INSTRUCTION_IGNORE_MISFIRE_POLICY 
+	 同cornTrigger的策略[获取到资源后，立即执行，将错过的任务执行。然后按照正常频率执行]
+- MISFIRE_INSTRUCTION_SMART_POLICY
+	若当前任务只执行一次，那么其策略选取MISFIRE_INSTRUCTION_FIRE_NOW
+	若当前任务无限次执行，则其策略为MISFIRE_INSTRUCTION_RESCHEDULE_NEXT_WITH_REMAINING_COUNT
+	其他场景任务策略为：MISFIRE_INSTRUCTION_RESCHEDULE_NOW_WITH_EXISTING_REPEAT_COUNT
+- MISFIRE_INSTRUCTION_FIRE_NOW
+	立刻执行。eg：若任务定义为18:00执行，每10min执行一次，执行5次，那么正常情况下执行的时间点为[18:00,18:10,18:20,18:30,18:40],若在18:09分宕机，直到18:25才恢复，那么下次执行的点就是18:25，最终执行的时间点为：[18:00,18:25,18:35,18:45,18:55,19:05].此处执行了6次。从代码里也能看出，fire now策略只改变了触发时间，而没有改变重复次数。
+
+- MISFIRE_INSTRUCTION_RESCHEDULE_NOW_WITH_EXISTING_REPEAT_COUNT
+	当前时间点立即执行一次，然后以该时间点开始，IntervalInSeconds为时间间隔，依次执行。执行次数不变。eg：例子中的执行时间点为[18:00,18:25,18:35,18:45,18:55]
+
+- MISFIRE_INSTRUCTION_RESCHEDULE_NOW_WITH_REMAINING_REPEAT_COUNT
+	当前时间点立刻执行，以后以该时间点开始，依次执行。如果有错过的任务，则就丢弃，不再执行。
+
+- MISFIRE_INSTRUCTION_RESCHEDULE_NEXT_WITH_REMAINING_COUNT
+	下一个周期点执行，之前的错过的任务就错过了，不再执行。eg：若任务定义为18:00执行，每10min执行一次，执行5次，那么正常情况下执行的时间点为[18:00,18:10,18:20,18:30,18:40],若在18:09分宕机，直到18:27才恢复，那么下次执行的点就是18:30，其中18:10和18:20两次任务就不再执行了，最终执行的时间点为：[18:00,18:30,18:40]
+
+- MISFIRE_INSTRUCTION_RESCHEDULE_NEXT_WITH_EXISTING_COUNT
+	保证任务执行次数不丢。计算下一个执行点开始执行。eg： 若任务定义为18:00执行，每10min执行一次，执行5次，那么正常情况下执行的时间点为[18:00,18:10,18:20,18:30,18:40],若在18:09分宕机，直到18:27才恢复，那么下次执行的点就是18:30。任务最终的执行时间点为：[18:00,18:30,18:40,18:50,19:00]
+
+```
+
+
+
+
+
+
+
