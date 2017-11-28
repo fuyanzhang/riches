@@ -1,6 +1,39 @@
 ## Quartz 调度流程 ##
 ![quartz任务调度流程](https://github.com/fuyanzhang/riches/blob/master/%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/task%E5%AD%A6%E4%B9%A0/quartz/quartz%E8%B0%83%E5%BA%A6.png)
 
+## Quartz 恢复机制 ##
+调度器在start的时候，做了两件事情。
+1、启动集群的健康性检查线程。
+2、启动集群的misfired处理线程。
+具体代码如下：
+```
+public void schedulerStarted() throws SchedulerException {
+
+        if (isClustered()) {
+            clusterManagementThread = new ClusterManager();
+            if(initializersLoader != null)
+                clusterManagementThread.setContextClassLoader(initializersLoader);
+            clusterManagementThread.initialize();
+        } else {
+            try {
+                recoverJobs();
+            } catch (SchedulerException se) {
+                throw new SchedulerConfigException(
+                        "Failure occured during job recovery.", se);
+            }
+        }
+
+        misfireHandler = new MisfireHandler();
+        if(initializersLoader != null)
+            misfireHandler.setContextClassLoader(initializersLoader);
+        misfireHandler.initialize();
+        schedulerRunning = true;
+        
+        getLog().debug("JobStore background threads started (as scheduler was started).");
+    }
+```
+
+
 
 ## Quartz misfired机制 ##
 
@@ -200,6 +233,8 @@ simpleTrigger有7种策略。
 	保证任务执行次数不丢。计算下一个执行点开始执行。eg： 若任务定义为18:00执行，每10min执行一次，执行5次，那么正常情况下执行的时间点为[18:00,18:10,18:20,18:30,18:40],若在18:09分宕机，直到18:27才恢复，那么下次执行的点就是18:30。任务最终的执行时间点为：[18:00,18:30,18:40,18:50,19:00]
 
 ```
+
+
 
 
 
