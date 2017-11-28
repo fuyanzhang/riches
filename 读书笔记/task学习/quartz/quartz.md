@@ -32,7 +32,13 @@ public void schedulerStarted() throws SchedulerException {
         getLog().debug("JobStore background threads started (as scheduler was started).");
     }
 ```
+ClusterManager线程是健康性检查线程。检测频率可配置，配置项为：org.quartz.jobStore.clusterCheckinInterval
+clusterManager的主要完成的逻辑如下：
+clusterManager会周期的调用manager()方法。manager中主要逻辑在docheckin中。
+doCheckin首先查询表qrtz_scheduler_state，获取集群调度器实例。获取失效实例（通过表中last_checkin_time和checkin_interval计算出预期的下次checkin的时间，若小于当前时间，认为实例失效）。
+遍历失效实例，修复表qrtz_triggers中相应实例对应的triggers的状态并删除qrtz_fired_triggers中相应的trigger。然后删除qrtz_scheduler_state的失效实例。
 
+MisfireHandler的线程主要是扫描misfired的trigger，检查周期60s。根据不同的misfired处理策略，计算出next_fire_time。等待正常的处理线程获取trigger进行调度。
 
 
 ## Quartz misfired机制 ##
