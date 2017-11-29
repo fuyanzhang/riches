@@ -90,9 +90,26 @@ public void scheduleJob(final String cron) {
 	主节点选举监听器添加了2个监听:LeaderElectionJobListener和LeaderAbdicationJobListener
 		LeaderElectionJobListener主要监听/jobname/servers/${ip} 节点是否有变化。若有变化且没有主节点，则开始选举主节点[选主节点所用的锁目录为/jobname/leader/election/latch]。主节点在zk上是一个临时节点。节点为/jobname/leader/election/instance，值为ip。
 		LeaderAbdicationJobListener监听/jobname/servers/${ip}。如果服务器状态时disable的，那么就删除主节点，重新选取。
+
 2.分片监听管理器
 
 	该监听器有两个监听;ShardingTotalCountChangedJobListener和ListenServersChangedJobListener
+		ShardingTotalCountChangedJobListener 主要监控分片总数是否改变。监控的路径为/jobname/config,若分片总数改变且原分片不为0，则设置需要重新分片。标志位路径为/jobname/leader/sharding/necessary
+		ListenServersChangedJobListener 主要监控作业实例和作业服务器是否有变化，若有变化，同样需要重新分片。作业实例和作业服务器的节点分别为/jobname/instances和/jobname/servers/${ip}
+
+3.失效转移监听管理器
+	
+	该管理器也同样有2个监听：JobCrashedJobListener和FailoverSettingsChangedJobListener
+		JobCrashedJobListener主要是做任务失效转移。任务分片数据存放路径/jobname/sharding/${item}/failover下,value值为该分片被分片的任务实例。该任务宕机后，将该任务所属的分片信息放入/jobname/leader/failover/items/${item}路径下，方法是failoverService.setCrashedFailoverFlag(each);。然后选取一个节点来执行该分片【failoverService.failoverIfNecessary()】。failoverService.failoverIfNecessary()主要逻辑是获取分布式锁，获取一个item分片，填充/jobname/sharding/${item}/failover路径数据,value为执行分片的任务实例ID。删除/jobname/leader/failover/items/${item}路径。然后获取调度器进行任务的执行。
+		FailoverSettingsChangedJobListener主要是监听/jobname/config中的isFailover是否有变化，如果变为FALSE，即关闭失效转移功能，则删除失效转移信息。即删除/jobname/sharding/${item}/failover节点。
+
+4.幂等性监听管理器
+
+	该管理器的监听器为MonitorExecutionSettingsChangedJobListener，主要是监控/jobname/config中任务信息MonitorExecution是否有更新，若更新为不监控分片执行状态，则删除记录任务执行状态的节点，删除路径为/jobname/sharding/${item}/running路径。
+
+5.运行实例关闭监听管理器
+
+	该监听管理器管理InstanceShutdownStatusJobListener监听。
 
 
 
