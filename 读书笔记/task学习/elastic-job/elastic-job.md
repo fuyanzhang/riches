@@ -38,15 +38,54 @@ init主要做了如下几件事情：
 5. 准备任务启动的相关信息。主要是各种服务的启动【占大头的】。代码如下：
 ```
 public void registerStartUpInfo(final boolean enabled) {
-        listenerManager.startAllListeners();
-        leaderService.electLeader();
-        serverService.persistOnline(enabled);
-        instanceService.persistOnline();
-        shardingService.setReshardingFlag();
-        monitorService.listen();
+        listenerManager.startAllListeners();   // 1:开启所有监听器
+        leaderService.electLeader();    // 2:选取主节点
+        serverService.persistOnline(enabled); //3:持久化作业服务器信息 
+        instanceService.persistOnline();    //4:持久化作业运行实例
+        shardingService.setReshardingFlag();// 5:设置需要重新分片的标记
+        monitorService.listen();            //6:初始化作业监听服务
         if (!reconcileService.isRunning()) {
-            reconcileService.startAsync();
+            reconcileService.startAsync();    // 7:调解分布式作业不一致状态服务
         }
     }
 ```
+
+6. 开始调度任务。从代码上看，elastic-job不支持SimpleTrigger。代码如下：
+```
+public void scheduleJob(final String cron) {
+        try {
+            if (!scheduler.checkExists(jobDetail.getKey())) {
+                scheduler.scheduleJob(jobDetail, createTrigger(cron));
+            }
+            scheduler.start();
+        } catch (final SchedulerException ex) {
+            throw new JobSystemException(ex);
+        }
+    }
+```
+
+#### 详解registerStartUpInfo方法 ####
+该方法共干了7件事。一一走读代码。
+##### 开启所有监听 #####
+代码如下:
+```
+ /**
+     * 开启所有监听器.
+     */
+    public void startAllListeners() {
+        electionListenerManager.start();
+        shardingListenerManager.start();
+        failoverListenerManager.start();
+        monitorExecutionListenerManager.start();
+        shutdownListenerManager.start();
+        triggerListenerManager.start();
+        rescheduleListenerManager.start();
+        guaranteeListenerManager.start();
+        jobNodeStorage.addConnectionStateListener(regCenterConnectionStateListener);
+    }
+```
+
+
+
+
 
