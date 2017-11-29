@@ -73,17 +73,28 @@ public void scheduleJob(final String cron) {
      * 开启所有监听器.
      */
     public void startAllListeners() {
-        electionListenerManager.start();
-        shardingListenerManager.start();
-        failoverListenerManager.start();
-        monitorExecutionListenerManager.start();
-        shutdownListenerManager.start();
-        triggerListenerManager.start();
-        rescheduleListenerManager.start();
-        guaranteeListenerManager.start();
-        jobNodeStorage.addConnectionStateListener(regCenterConnectionStateListener);
+        electionListenerManager.start();   //主节点选举监听管理器.
+        shardingListenerManager.start();   //分片监听管理器.
+        failoverListenerManager.start();   //失效转移监听管理器.
+        monitorExecutionListenerManager.start();//幂等性监听管理器.
+        shutdownListenerManager.start();   //运行实例关闭监听管理器.
+        triggerListenerManager.start();    //作业触发监听管理器.
+        rescheduleListenerManager.start(); //重调度监听管理器.
+        guaranteeListenerManager.start();  //保证分布式任务全部开始和结束状态监听管理器.
+        jobNodeStorage.addConnectionStateListener(regCenterConnectionStateListener); //注册连接状态监听器.
     }
 ```
+
+1.主节点选举监听
+ 
+	主节点选举监听器添加了2个监听:LeaderElectionJobListener和LeaderAbdicationJobListener
+		LeaderElectionJobListener主要监听/jobname/servers/${ip} 节点是否有变化。若有变化且没有主节点，则开始选举主节点[选主节点所用的锁目录为/jobname/leader/election/latch]。主节点在zk上是一个临时节点。节点为/jobname/leader/election/instance，值为ip。
+		LeaderAbdicationJobListener监听/jobname/servers/${ip}。如果服务器状态时disable的，那么就删除主节点，重新选取。
+2.分片监听管理器
+
+	该监听器有两个监听;ShardingTotalCountChangedJobListener和ListenServersChangedJobListener
+
+
 
 
 
