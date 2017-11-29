@@ -88,7 +88,7 @@ public void scheduleJob(final String cron) {
 1.主节点选举监听
  
 	主节点选举监听器添加了2个监听:LeaderElectionJobListener和LeaderAbdicationJobListener
-		LeaderElectionJobListener主要监听/jobname/servers/${ip} 节点是否有变化。若有变化且没有主节点，则开始选举主节点[选主节点所用的锁目录为/jobname/leader/election/latch]。主节点在zk上是一个临时节点。节点为/jobname/leader/election/instance，值为ip。
+		LeaderElectionJobListener主要监听/jobname/servers/${ip} 节点是否有变化。若有变化且没有主节点，则开始选举主节点[选主节点所用的锁目录为/jobname/leader/election/latch]。主节点在zk上是一个临时节点。节点为/jobname/leader/election/instance，值为任务实例ID。
 		LeaderAbdicationJobListener监听/jobname/servers/${ip}。如果服务器状态时disable的，那么就删除主节点，重新选取。
 
 2.分片监听管理器
@@ -138,6 +138,120 @@ public void scheduleJob(final String cron) {
     }
 	```
 
+
+##### 选取主节点 #####
+
+选取主节点的逻辑很简单，获取分布式锁/jobname/leader/election/latch,然后创建临时节点/jobname/leader/election/instance，值为任务实例ID。
+
+##### 持久化作业服务器信息 #####
+
+该逻辑也很简单，主要是注册任务的执行机信息。在zk上的路径为/jobname/servers/${ip} ,值为是否被禁用。若未禁用，则是“”，若为disable，则入DISABLED
+
+##### 持久化作业运行实例 #####
+
+该过程主要是注册任务实例。在zk上的路径为/jobname/instances/${instanceid},是一个临时节点。值为“”。
+
+##### 设置需要重新分片的标记 #####
+
+创建分片标志路径，路径为：/jobname/leader/sharding/necessary
+
+##### 初始化作业监听服务 #####
+
+主要用于dump zk上的数据。
+
+##### 调解分布式作业不一致状态服务 #####
+
+
+
+
+### job执行过程（以LiteJob为例） ###
+
+lite模式下，创建quartz的jobDetail使用的job为LiteJob，LiteJob实现了quartz的Job接口。
+
+执行作业过程如下
+```
+ public final void execute() {
+        try {
+			//环境检查，注册中心与本地的时间误差是否在容忍范围内
+            jobFacade.checkJobExecutionEnvironment();
+        } catch (final JobExecutionEnvironmentException cause) {
+            jobExceptionHandler.handleException(jobName, cause);
+        }
+		//获取分片信息
+        ShardingContexts shardingContexts = jobFacade.getShardingContexts();
+        if (shardingContexts.isAllowSendJobEvent()) {
+            jobFacade.postJobStatusTraceEvent(shardingContexts.getTaskId(), State.TASK_STAGING, String.format("Job '%s' execute begin.", jobName));
+        }
+		
+		//设置任务misfired的标志。（判断当前的任务执行前，任务分片是否有running状态，有，则置本次任务为misfired。）
+		//判断路径/jobname/sharding/${item}/running节点是否存在，存在，则认为有任务在执行，设本次任务misfired，在
+		//zk上添加节点/jobname/sharding/${item}/misfire
+        if (jobFacade.misfireIfRunning(shardingContexts.getShardingItemParameters().keySet())) {
+            if (shardingContexts.isAllowSendJobEvent()) {
+                jobFacade.postJobStatusTraceEvent(shardingContexts.getTaskId(), State.TASK_FINISHED, String.format(
+                        "Previous job '%s' - shardingItems '%s' is still running, misfired job will start after previous job completed.", jobName, 
+                        shardingContexts.getShardingItemParameters().keySet()));
+            }
+            return;
+        }
+        try {
+            jobFacade.beforeJobExecuted(shardingContexts);
+            //CHECKSTYLE:OFF
+        } catch (final Throwable cause) {
+            //CHECKSTYLE:ON
+            jobExceptionHandler.handleException(jobName, cause);
+        }
+		//执行任务
+        execute(shardingContexts, JobExecutionEvent.ExecutionSource.NORMAL_TRIGGER);
+		// 任务执行完之后，查看在任务执行过程中是否有任务没有被执行，若有，则执行之
+        while (jobFacade.isExecuteMisfired(shardingContexts.getShardingItemParameters().keySet())) {
+            jobFacade.clearMisfire(shardingContexts.getShardingItemParameters().keySet());
+            execute(shardingContexts, JobExecutionEvent.ExecutionSource.MISFIRE);
+        }
+        jobFacade.failoverIfNecessary();
+        try {
+            jobFacade.afterJobExecuted(shardingContexts);
+            //CHECKSTYLE:OFF
+        } catch (final Throwable cause) {
+            //CHECKSTYLE:ON
+            jobExceptionHandler.handleException(jobName, cause);
+        }
+    }
+```
+
+
+具体的任务执行代码如下：
+
+```
+  private void execute(final ShardingContexts shardingContexts, final JobExecutionEvent.ExecutionSource executionSource) {
+        if (shardingContexts.getShardingItemParameters().isEmpty()) {
+            if (shardingContexts.isAllowSendJobEvent()) {
+                jobFacade.postJobStatusTraceEvent(shardingContexts.getTaskId(), State.TASK_FINISHED, String.format("Sharding item for job '%s' is empty.", jobName));
+            }
+            return;
+        }
+        jobFacade.registerJobBegin(shardingContexts);
+        String taskId = shardingContexts.getTaskId();
+        if (shardingContexts.isAllowSendJobEvent()) {
+            jobFacade.postJobStatusTraceEvent(taskId, State.TASK_RUNNING, "");
+        }
+        try {
+            process(shardingContexts, executionSource);
+        } finally {
+            // TODO 考虑增加作业失败的状态，并且考虑如何处理作业失败的整体回路
+            jobFacade.registerJobCompleted(shardingContexts);
+            if (itemErrorMessages.isEmpty()) {
+                if (shardingContexts.isAllowSendJobEvent()) {
+                    jobFacade.postJobStatusTraceEvent(taskId, State.TASK_FINISHED, "");
+                }
+            } else {
+                if (shardingContexts.isAllowSendJobEvent()) {
+                    jobFacade.postJobStatusTraceEvent(taskId, State.TASK_ERROR, itemErrorMessages.toString());
+                }
+            }
+        }
+    }
+```
 
 
 
