@@ -109,7 +109,34 @@ public void scheduleJob(final String cron) {
 
 5.运行实例关闭监听管理器
 
-	该监听管理器管理InstanceShutdownStatusJobListener监听。
+	该监听管理器管理InstanceShutdownStatusJobListener监听。监听/jobname/instances/instanceid是否被remove，若被remove，则将内存中相关的信息删除。
+
+6.作业触发监听管理器
+
+7.重调度监听管理器
+
+	CronSettingAndJobEventChangedJobListener 修改了任务的配置信息时，即【/jobname/config】下的内容时，触发该监听。当发现是任务周期发生变化时，则需要重新调度。其他的修改不重新调度。【在crm系统中，修改了任务的调度周期，可能会出现任务多执行的情况。】
+
+8.保证分布式任务全部开始和结束状态监听管理器
+	
+9.regCenterConnectionStateListener
+	该监听器主要是监听节点与zk的链接状态，若连接异常，则将任务暂停，若连接恢复，则恢复任务。
+	```
+		 public void stateChanged(final CuratorFramework client, final ConnectionState newState) {
+        if (JobRegistry.getInstance().isShutdown(jobName)) {
+            return;
+        }
+        JobScheduleController jobScheduleController = JobRegistry.getInstance().getJobScheduleController(jobName);
+        if (ConnectionState.SUSPENDED == newState || ConnectionState.LOST == newState) {
+            jobScheduleController.pauseJob();
+        } else if (ConnectionState.RECONNECTED == newState) {
+            serverService.persistOnline(serverService.isEnableServer(JobRegistry.getInstance().getJobInstance(jobName).getIp()));
+            instanceService.persistOnline();
+            executionService.clearRunningInfo(shardingService.getLocalShardingItems());
+            jobScheduleController.resumeJob();
+        }
+    }
+	```
 
 
 
