@@ -5,11 +5,11 @@
 
 ### zk目录 ###
 ${root}/jobname/
-				config
-				servers
-				instances
-				leader
-				sharding
+				config    ----任务配置信息
+				servers	  ----任务执行服务器ip
+				instances ----任务执行实例
+				leader    ----主节点选举相关信息
+				sharding  ----分片信息
 
 ### 代码详解（以spring的方式为例） ###
 
