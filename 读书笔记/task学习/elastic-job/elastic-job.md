@@ -4,6 +4,12 @@
 ![](https://github.com/fuyanzhang/riches/blob/master/%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/task%E5%AD%A6%E4%B9%A0/elastic-job/pic/job%E5%88%9D%E5%A7%8B%E5%8C%96%E8%BF%87%E7%A8%8B.png)
 
 ### zk目录 ###
+${root}/jobname/
+				config
+				servers
+				instances
+				leader
+				sharding
 
 ### 代码详解（以spring的方式为例） ###
 
@@ -297,6 +303,13 @@ lite模式下，创建quartz的jobDetail使用的job为LiteJob，LiteJob实现�
 ```
 
 该段代码中的process方法 process(shardingContexts, each, jobExecutionEvent)是一个抽象方法，不同的job有不同的实现，最后都会调到ElasticJob的实现类的execute方法。该方法是真正的业务逻辑实现。
+
+#### elastic-job misfired策略 ####
+
+elastic-job判断misfired的方式是看zk上是否有/jobname/sharding/${item}/running，若有该路径，则说明上次任务没有完成，本次任务的相关分片置为失效。由于没有记录misfired的周期，如果有多个周期misfired，系统恢复后，只会执行一次，不会把之前的所有周期重做一遍。
+
+
+
 
 
 
