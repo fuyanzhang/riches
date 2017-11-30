@@ -224,18 +224,22 @@ lite模式下，创建quartz的jobDetail使用的job为LiteJob，LiteJob实现�
 
 ```
   private void execute(final ShardingContexts shardingContexts, final JobExecutionEvent.ExecutionSource executionSource) {
+		//如果分片为空，直接返回
         if (shardingContexts.getShardingItemParameters().isEmpty()) {
             if (shardingContexts.isAllowSendJobEvent()) {
                 jobFacade.postJobStatusTraceEvent(shardingContexts.getTaskId(), State.TASK_FINISHED, String.format("Sharding item for job '%s' is empty.", jobName));
             }
             return;
         }
+		//注册作业启动信息。修改注册中心的任务状态为running，在zk上创建临时节点/jobname/sharding/${item}/running，表示该分片正在执行
         jobFacade.registerJobBegin(shardingContexts);
         String taskId = shardingContexts.getTaskId();
         if (shardingContexts.isAllowSendJobEvent()) {
             jobFacade.postJobStatusTraceEvent(taskId, State.TASK_RUNNING, "");
         }
         try {
+
+			//真正的开始执行任务
             process(shardingContexts, executionSource);
         } finally {
             // TODO 考虑增加作业失败的状态，并且考虑如何处理作业失败的整体回路
@@ -252,6 +256,47 @@ lite模式下，创建quartz的jobDetail使用的job为LiteJob，LiteJob实现�
         }
     }
 ```
+
+执行任务的代码如下：
+
+```
+ private void process(final ShardingContexts shardingContexts, final JobExecutionEvent.ExecutionSource executionSource) {
+        Collection<Integer> items = shardingContexts.getShardingItemParameters().keySet();
+		//若果是一个分片，则同步执行
+        if (1 == items.size()) {
+            int item = shardingContexts.getShardingItemParameters().keySet().iterator().next();
+            JobExecutionEvent jobExecutionEvent =  new JobExecutionEvent(shardingContexts.getTaskId(), jobName, executionSource, item);
+            process(shardingContexts, item, jobExecutionEvent);
+            return;
+        }
+        final CountDownLatch latch = new CountDownLatch(items.size());
+		//若是大于1个分片，则放入线程池中异步执行，直到所有的分片都执行完之后，算该任务在该实例上执行完【=1和>1的场景都一样啊，为啥不同样处理？？？？】
+        for (final int each : items) {
+            final JobExecutionEvent jobExecutionEvent = new JobExecutionEvent(shardingContexts.getTaskId(), jobName, executionSource, each);
+            if (executorService.isShutdown()) {
+                return;
+            }
+            executorService.submit(new Runnable() {
+                
+                @Override
+                public void run() {
+                    try {
+                        process(shardingContexts, each, jobExecutionEvent);
+                    } finally {
+                        latch.countDown();
+                    }
+                }
+            });
+        }
+        try {
+            latch.await();
+        } catch (final InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+    }
+```
+
+该段代码中的process方法 process(shardingContexts, each, jobExecutionEvent)是一个抽象方法，不同的job有不同的实现，最后都会调到ElasticJob的实现类的execute方法。该方法是真正的业务逻辑实现。
 
 
 
